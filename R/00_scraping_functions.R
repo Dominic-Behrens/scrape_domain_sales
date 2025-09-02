@@ -24,6 +24,22 @@ paste_every_third <- function(x, sep = " ") {
   split(x, groups) %>%
     map_chr(paste, collapse = sep)
 }
+#function to check strings are formatted appropriately
+check_string_format <- function(input_string) {
+  # Check if input is a character string
+  if (!is.character(input_string) || length(input_string) != 1) {
+    return(FALSE)
+  }
+  
+  # Count the number of hyphens in the string
+  hyphen_count <- nchar(input_string) - nchar(gsub("-", "", input_string))
+  
+  # Check if string ends with exactly 4 digits
+  ends_with_4_digits <- grepl("\\d{4}$", input_string)
+  
+  # Return TRUE if both conditions are met
+  return(hyphen_count >= 2 && ends_with_4_digits)
+}
 #function to convert the HTML from a sold listings page on domain into a clean dataframe
 html_to_frame <- function(html_content) {
   # Read the page
@@ -118,22 +134,39 @@ check_for_more_pages<-function(url){
   }}
 }
 
-#Function to scrape given a url
-url_base<-"https://www.domain.com.au/sold-listings/rushcutters-bay-nsw-2011/?excludepricewithheld=1&page="
-i<-1
-more_pages<-T
-out_frame<-data.frame()
-while(more_pages==T){
-  cat(paste0('Scraping page ',i,'\n'))
-  #build url
-  url_full<-paste0(url_base,i)
-  #scrape first page
-  temp_frame<-scrape_page(url_full)
-  out_frame%<>%bind_rows(temp_frame)
-  #check for next and end if no more, otherwise update index and repeat
-  if(check_for_more_pages(url_full)==0){
-    more_pages<-F
-  } else{
-   i<-i+1
+
+#Function to scrape given a suburb-state-postcode string
+scrape_suburb<-function(suburb_string){
+  #high level checks for validity of string
+  #needs to have at least 2 dashes and end in a 4 digit number
+  check_string<-check_string_format(suburb_string)
+  if(check_string==F){
+    cat('Invalid Suburb, check formatting\n')
+    return()
   }
+  #build url base
+  url_base<-paste0('https://www.domain.com.au/sold-listings/',suburb_string,'/?page=')
+  i<-1
+  more_pages<-T
+  out_frame<-data.frame()
+  while(more_pages==T){
+    cat(paste0('Scraping page ',i,'\n'))
+    #build url
+    url_full<-paste0(url_base,i)
+    #scrape first page
+    temp_frame<-scrape_page(url_full)
+    out_frame%<>%bind_rows(temp_frame)
+    #check for next and end if no more, otherwise update index and repeat
+    if(check_for_more_pages(url_full)==0){
+      more_pages<-F
+    } else{
+      i<-i+1
+    }
+  }
+  last_date<-out_frame%>%
+    slice_tail(n=1)%>%
+    pull(date)
+  cat(paste0('Reached limit for suburb, final sale: ',last_date))
+  return(out_frame)
 }
+
