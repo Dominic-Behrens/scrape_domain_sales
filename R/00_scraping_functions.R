@@ -92,7 +92,7 @@ scrape_page<-function(url){
   sales_frame<-html_to_frame(page_html)
   return(sales_frame)
 }
-#function to check if there are further pages to scrape- returns 0 if there are more to scrape, 1 otherwise
+#function to check if there are further pages to scrape- returns 1 if there are more to scrape, 0 otherwise
 check_for_more_pages<-function(url){
   check_sesh<-ChromoteSession$new()
   on.exit(check_sesh$close(), add = TRUE)
@@ -104,10 +104,21 @@ check_for_more_pages<-function(url){
    document.querySelectorAll("[data-testid=\\"paginator-navigation-button\\"]:not([disabled])")
      .length
  ')$result$value
-  return(count_disabled)
+  if(count_disabled==0){
+    return(1)}else{
+  page_link<-check_sesh$Runtime$evaluate("
+  document.querySelector('a[data-testid=\"paginator-navigation-button\"]').getAttribute('href')
+")$result$value
+  next_page_num<-as.numeric(sub(".*=","",page_link))
+  current_page_num<-as.numeric(sub(".*=","",url))
+  if(next_page_num>current_page_num){
+    return(1)
+  }else{
+    return(0)
+  }}
 }
 
-#Test run- extract all sales in Rushcutters Bay
+#Function to scrape given a url
 url_base<-"https://www.domain.com.au/sold-listings/rushcutters-bay-nsw-2011/?excludepricewithheld=1&page="
 i<-1
 more_pages<-T
@@ -120,7 +131,7 @@ while(more_pages==T){
   temp_frame<-scrape_page(url_full)
   out_frame%<>%bind_rows(temp_frame)
   #check for next and end if no more, otherwise update index and repeat
-  if(check_for_more_pages(url_full)>0){
+  if(check_for_more_pages(url_full)==0){
     more_pages<-F
   } else{
    i<-i+1
