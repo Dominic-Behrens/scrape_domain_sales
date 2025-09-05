@@ -150,9 +150,9 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
   #build url
   #toggle if you include price witheld or not
   if(exclude_withheld==T){
-    url_suffix<-'/?excludepricewithheld=1&page='
+    url_suffix<-'/?excludepricewithheld=1&ssubs=0&page='
   }else{
-    url_suffix<-'&page='
+    url_suffix<-'&ssubs=0&page='
   }
   #add in dwelling type if specified
   url_suffix<-case_when(
@@ -184,9 +184,8 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
   last_date<-out_frame%>%
     slice_tail(n=1)%>%
     pull(date)
-  cat(paste0('Reached limit for suburb, final sale: ',last_date))
+  cat(paste0('Reached limit for suburb, final sale: ',last_date,'\n'))
   return(out_frame)
 }
 
-#Function to build suburb string
 
