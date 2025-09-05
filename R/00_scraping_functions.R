@@ -37,8 +37,11 @@ check_string_format <- function(input_string) {
   # Check if string ends with exactly 4 digits
   ends_with_4_digits <- grepl("\\d{4}$", input_string)
   
+  #check if string contains a state string
+  contains_state<-str_detect(input_string,"nsw|act|qld|wa|vic|sa|tas")
+
   # Return TRUE if both conditions are met
-  return(hyphen_count >= 2 && ends_with_4_digits)
+  return(hyphen_count >= 2 && ends_with_4_digits && contains_state)
 }
 #function to convert the HTML from a sold listings page on domain into a clean dataframe
 html_to_frame <- function(html_content) {
@@ -136,23 +139,38 @@ check_for_more_pages<-function(url){
 
 
 #Function to scrape given a suburb-state-postcode string
-scrape_suburb<-function(suburb_string){
+scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House','Apartment','Townhouse','All')){
   #high level checks for validity of string
-  #needs to have at least 2 dashes and end in a 4 digit number
+  #needs to have at least 2 dashes and end in a 4 digit number, as well as contain one of the state strings
   check_string<-check_string_format(suburb_string)
   if(check_string==F){
     cat('Invalid Suburb, check formatting\n')
     return()
   }
-  #build url base
-  url_base<-paste0('https://www.domain.com.au/sold-listings/',suburb_string,'/?page=')
+  #build url
+  #toggle if you include price witheld or not
+  if(exclude_withheld==T){
+    url_suffix<-'/?excludepricewithheld=1&page='
+  }else{
+    url_suffix<-'&page='
+  }
+  #add in dwelling type if specified
+  url_suffix<-case_when(
+    dwelling_type=='All'~url_suffix,
+    dwelling_type=='House'~paste0('/house',url_suffix),
+    dwelling_type=='Apartment'~paste0('/apartment',url_suffix),
+    dwelling_type=='Townhouse'~paste0('/town-house',url_suffix))
+
+  #pull it all together
+  url_base<-paste0('https://www.domain.com.au/sold-listings/',suburb_string,url_suffix)
+
   i<-1
   more_pages<-T
   out_frame<-data.frame()
   while(more_pages==T){
-    cat(paste0('Scraping page ',i,'\n'))
     #build url
     url_full<-paste0(url_base,i)
+    cat(paste0('Scraping page ',i,', url: ',url_full,'\n'))
     #scrape first page
     temp_frame<-scrape_page(url_full)
     out_frame%<>%bind_rows(temp_frame)
@@ -169,4 +187,6 @@ scrape_suburb<-function(suburb_string){
   cat(paste0('Reached limit for suburb, final sale: ',last_date))
   return(out_frame)
 }
+
+#Function to build suburb string
 
