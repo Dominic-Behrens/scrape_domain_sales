@@ -113,10 +113,12 @@ scrape_page<-function(url){
 }
 #function to check if there are further pages to scrape- returns 1 if there are more to scrape, 0 otherwise
 check_for_more_pages<-function(url){
+  #set up session
   check_sesh<-ChromoteSession$new()
   on.exit(check_sesh$close(), add = TRUE)
   check_sesh$Page$navigate(url)
   Sys.sleep(2)
+  #check how many buttons are 'disabled'
   count_disabled <- check_sesh$Runtime$evaluate('
    document.querySelectorAll("[data-testid=\\"paginator-navigation-button\\"]")
      .length - 
@@ -125,6 +127,9 @@ check_for_more_pages<-function(url){
  ')$result$value
   if(count_disabled==0){
     return(1)}else{
+      if(count_disabled==2){
+        return(0)
+      }else{
   page_link<-check_sesh$Runtime$evaluate("
   document.querySelector('a[data-testid=\"paginator-navigation-button\"]').getAttribute('href')
 ")$result$value
@@ -134,7 +139,7 @@ check_for_more_pages<-function(url){
     return(1)
   }else{
     return(0)
-  }}
+  }}}
 }
 
 

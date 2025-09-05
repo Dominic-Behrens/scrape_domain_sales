@@ -39,6 +39,17 @@ theme_cie<-function(){
 
 #source functions
 source('./R/00_scraping_functions.R')
+#download and unzip files if not in the folder
+if(!file.exists('./Inputs/POA_2021_AUST_GDA2020.shp')){
+  download.file("https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/access-and-downloads/digital-boundary-files/POA_2021_AUST_GDA2020_SHP.zip",
+                destfile='./Inputs/POA_2021_AUST_GDA2020.zip')
+  unzip('./Inputs/POA_2021_AUST_GDA2020.zip',exdir='./Inputs')
+}
+if(!file.exists('./Inputs/SAL_2021_AUST_GDA2020.shp')){
+  download.file("https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/access-and-downloads/digital-boundary-files/SAL_2021_AUST_GDA2020_SHP.zip",
+                destfile='./Inputs/SAL_2021_AUST_GDA2020.zip')
+  unzip('./Inputs/SAL_2021_AUST_GDA2020.zip',exdir='./Inputs')
+}
 
 
 #read in suburb shapefile
@@ -47,8 +58,7 @@ suburbs_shp<-st_read('./Inputs/SAL_2021_AUST_GDA2020.shp')%>%
   select(c('sal_name21','ste_name21'))
 
 #read in postcode shapefile
-poa_shp<-st_read('./Inputs/POA_2021_AUST_GDA94.shp')%>%
-  st_transform(7844)%>%
+poa_shp<-st_read('./Inputs/POA_2021_AUST_GDA2020.shp')%>%
   clean_names()%>%
   select(c('poa_name21'))
 
