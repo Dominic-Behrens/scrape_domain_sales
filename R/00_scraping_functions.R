@@ -217,8 +217,9 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
     #scrape first page
     temp_frame<-scrape_page(url_full)
     out_frame%<>%bind_rows(temp_frame)
-    #check for next and end if no more, otherwise update index and repeat
-    if(check_for_more_pages(url_full)==0){
+    #check for next and end if no more, otherwise update index and repeat. 
+    #Also end if more than 50 as this is max that will be displayed
+    if(check_for_more_pages(url_full)==0|i>50){
       more_pages<-F
     } else{
       i<-i+1
