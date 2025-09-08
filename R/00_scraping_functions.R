@@ -160,6 +160,25 @@ check_for_sales<-function(url){
    } 
 }
 
+#function to check for error, returns 1 if there's an error, 0 if good to proceed
+check_for_error <- function(url){
+  check_sesh <- ChromoteSession$new()
+  on.exit(check_sesh$close(), add = TRUE)
+  check_sesh$Page$navigate(url)
+  Sys.sleep(1)
+  
+  error_present <- check_sesh$Runtime$evaluate('
+    Array.from(document.querySelectorAll("h1[data-testid=\\"error-page__message-header\\"]"))
+      .some(el => el.textContent.trim() === "Oops...")
+  ')$result$value
+  
+  if(error_present == TRUE){
+    return(1)  # Error found
+  } else {
+    return(0)  # No error
+  }
+}
+
 #Function to scrape given a suburb-state-postcode string
 scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House','Apartment','Townhouse','All')){
   #high level checks for validity of string
@@ -184,9 +203,10 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
     dwelling_type=='Townhouse'~paste0('/town-house',url_suffix))
   #pull it all together
   url_base<-paste0('https://www.domain.com.au/sold-listings/',suburb_string,url_suffix)
-  #check that the URL has sales
+  #check that the URL has sales and that there's no error
   sales_check<-check_for_sales(paste0(url_base,1))
-  if(sales_check==1){
+  error_check<-check_for_error(paste0(url_base,1))
+  if(sales_check==1&error_check==0){
   i<-1
   more_pages<-T
   out_frame<-data.frame()
