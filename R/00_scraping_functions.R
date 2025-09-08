@@ -24,6 +24,8 @@ paste_every_third <- function(x, sep = " ") {
   split(x, groups) %>%
     map_chr(paste, collapse = sep)
 }
+
+
 #function to check strings are formatted appropriately
 check_string_format <- function(input_string) {
   # Check if input is a character string
@@ -142,6 +144,21 @@ check_for_more_pages<-function(url){
   }}}
 }
 
+#function to check there are actually sales on the page. Returns 1 if sales, 0 if none
+check_for_sales<-function(url){
+  check_sesh<-ChromoteSession$new()
+  on.exit(check_sesh$close(), add = TRUE)
+  check_sesh$Page$navigate(url)
+  Sys.sleep(1)
+  no_matches_present <- check_sesh$Runtime$evaluate('
+  Array.from(document.querySelectorAll("h3.css-1c8ubmt"))
+    .some(el => el.textContent.trim() === "No exact matches")
+')$result$value
+ if(no_matches_present==T){
+   return(0)}else{
+     return(1)
+   } 
+}
 
 #Function to scrape given a suburb-state-postcode string
 scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House','Apartment','Townhouse','All')){
@@ -165,10 +182,11 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
     dwelling_type=='House'~paste0('/house',url_suffix),
     dwelling_type=='Apartment'~paste0('/apartment',url_suffix),
     dwelling_type=='Townhouse'~paste0('/town-house',url_suffix))
-
   #pull it all together
   url_base<-paste0('https://www.domain.com.au/sold-listings/',suburb_string,url_suffix)
-
+  #check that the URL has sales
+  sales_check<-check_for_sales(paste0(url_base,1))
+  if(sales_check==1){
   i<-1
   more_pages<-T
   out_frame<-data.frame()
@@ -191,6 +209,8 @@ scrape_suburb<-function(suburb_string,exclude_withheld=T,dwelling_type=c('House'
     pull(date)
   cat(paste0('Reached limit for suburb, final sale: ',last_date,'\n'))
   return(out_frame)
+  }else{
+  return()
 }
-
+}
 
