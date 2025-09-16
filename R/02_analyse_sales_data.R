@@ -12,7 +12,9 @@ pacman::p_load(
   janitor,
   shiny,
   magrittr,
-  systemfonts
+  systemfonts,
+  quantreg,
+  biglm
 )
 
 #Basic Setup and Useful things
@@ -44,7 +46,7 @@ included_types<-c('Apartment / Unit / Flat','Duplex','House','New apartments / o
 
 nsw_sales%<>%filter(property_type%in%included_types)
 
-#functions---- 
+#cleaning---- 
 #split property characteristics into three columns
 make_feature_columns<-function(dataset,drop_non_standard=T){
   if(drop_non_standard==T){
@@ -68,7 +70,102 @@ cleaned_data<-make_feature_columns(nsw_sales)
 
 #filter out places with zero bathrooms- many parking spaces etc
 #and replace NA beds and parking with 0s
-
 cleaned_data%<>%filter(!is.na(baths))%>%
   mutate(parking=replace_na(parking,0),
-         beds=replace_na(beds,0))
+         beds=replace_na(beds,0),
+         postcode=substr(address2,nchar(address2)-3,nchar(address2)))
+
+#now fix up dates.
+date_prefixes<-c('Sold by private treaty','Sold at auction','Sold prior to auction','Sold')
+  
+cleaned_data%<>%mutate(
+  date=str_remove(date,paste(date_prefixes,collapse='|')),
+  date=str_trim(date),
+  year=substr(date,nchar(date)-3,nchar(date)))
+#Convert to LGA level
+#Read in Postcode-LGA concordance and tidy up to make 1 to 1
+poa_lga<-read_csv('./Inputs/CG_POSTCODE_2021_LGA_2022.csv')%>%
+  clean_names()%>%
+  group_by(postcode)%>%
+  filter(ratio_from_to==max(ratio_from_to))%>%
+  ungroup()%>%
+  select(c('postcode','lga_name_2022'))
+#join to data
+cleaned_data%<>%left_join(poa_lga)
+
+#Make higher level typology column
+apartment_types<-c("Apartment / Unit / Flat","Penthouse","New apartments / off the plan","Studio")
+townhouse_types<-c("Duplex",'Semi-detached','Terrace','Townhouse','Villa')
+
+cleaned_data%<>%mutate(
+  prop_type_clean=case_when(
+    property_type%in%apartment_types~"Apartment",
+    property_type%in%townhouse_types~"townhouse",
+    .default = "House")
+)
+
+#finally, tidy up prices into numeric
+cleaned_data%<>%
+  mutate(price=str_remove_all(price,"\\$"),
+         price=str_remove_all(price,","),
+         price=as.numeric(price))
+
+#analysis----
+#Get year-by-type stats by LGA
+lga_averages<-cleaned_data%>%
+  group_by(prop_type_clean,lga_name_2022,year)%>%
+  summarise(
+    med_price=median(price),
+    ave_price=mean(price)
+  )
+
+#estimate simple hedonic model
+#Beforehand, trim top and bottom 5 percent of sales within each lga 
+#and remove those with crazy numbers of beds, baths or parking (7,7 and 5)
+model_data<-cleaned_data%>%
+  group_by(lga_name_2022)%>%
+  filter(price<quantile(price,0.95),
+         price>quantile(price,0.05))%>%
+  ungroup()%>%
+  filter(beds<=7,
+         baths<=7,
+         parking<=5)
+
+#finally, arrange such that each LGA appears in each chunk otherwise we run into issues
+model_data%<>%
+  group_by(lga_name_2022) %>%
+  mutate(cycle = row_number()) %>%
+  ungroup() %>%
+  arrange(cycle, lga_name_2022) %>%
+  select(-cycle)
+#run model
+#need to use {biglm} because it gets big
+
+#chunk_1<-model_data[1:100000,]
+#rest_of_data<-model_data[100000:nrow(model_data),]
+#hedonic_model<-biglm(model_data,
+ #                    formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
+#chop rest into chunks
+#chunk_size<-100000
+#chunks<-ceiling(nrow(rest_of_data)/chunk_size)
+#for(i in seq(1,chunks)){
+ # cat(paste0('Regression update, chunk: ',i,'\n'))
+  #start <- 1+((i-1))*100000
+  #end <- min(i*100000,nrow(rest_of_data))
+  #data_chunk<-rest_of_data[start:end,]
+  #hedonic_model<-update(hedonic_model,data_chunk)
+#}
+#hedonic_model<-biglm(model_data,
+ #                 formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
+
+summary(hedonic_model)
+
+#make predictions
+exp(predict(hedonic_model,newdata = data.frame(lga_name_2022='Blacktown',
+                                           year="2024",
+                                           beds=3,
+                                           baths=2,
+                                           parking=1,
+                                           prop_type_clean='House')))
+
+#predict price of a 3-bedroom, 2 bath townhouse in each LGA in 2024
