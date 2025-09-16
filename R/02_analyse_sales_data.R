@@ -122,6 +122,7 @@ lga_averages<-cleaned_data%>%
 #estimate simple hedonic model
 #Beforehand, trim top and bottom 5 percent of sales within each lga 
 #and remove those with crazy numbers of beds, baths or parking (7,7 and 5)
+#also drop years pre 2020 as this reduces dimensionality
 model_data<-cleaned_data%>%
   group_by(lga_name_2022)%>%
   filter(price<quantile(price,0.95),
@@ -129,7 +130,8 @@ model_data<-cleaned_data%>%
   ungroup()%>%
   filter(beds<=7,
          baths<=7,
-         parking<=5)
+         parking<=5,
+         as.numeric(year)>=2020)
 
 #finally, arrange such that each LGA appears in each chunk otherwise we run into issues
 model_data%<>%
@@ -140,25 +142,9 @@ model_data%<>%
   select(-cycle)
 #run model
 #need to use {biglm} because it gets big
-
-#chunk_1<-model_data[1:100000,]
 #rest_of_data<-model_data[100000:nrow(model_data),]
-#hedonic_model<-biglm(model_data,
- #                    formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
-#chop rest into chunks
-#chunk_size<-100000
-#chunks<-ceiling(nrow(rest_of_data)/chunk_size)
-#for(i in seq(1,chunks)){
- # cat(paste0('Regression update, chunk: ',i,'\n'))
-  #start <- 1+((i-1))*100000
-  #end <- min(i*100000,nrow(rest_of_data))
-  #data_chunk<-rest_of_data[start:end,]
-  #hedonic_model<-update(hedonic_model,data_chunk)
-#}
-#hedonic_model<-biglm(model_data,
- #                 formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
-
-summary(hedonic_model)
+hedonic_model<-biglm(model_data,
+                    formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
 
 #make predictions
 exp(predict(hedonic_model,newdata = data.frame(lga_name_2022='Blacktown',
