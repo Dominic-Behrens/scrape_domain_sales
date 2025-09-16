@@ -85,17 +85,20 @@ suburbs_postcodes%<>%mutate(
   domain_suburb=paste(suburb_name_clean,state_name_short,poa_name21,sep='-')
 )
 
+
 #loop over NSW suburbs and scrape into a big dataset
 nsw_suburbs<-suburbs_postcodes%>%
   filter(ste_name21=='New South Wales')
 
 big_domain_dataset<-data.frame()
-
+#this occasionally fails for some reason. If you need to restart, just subset the list in the loop
 for(suburb in nsw_suburbs$domain_suburb){
   cat(paste0('Scraping sales from suburb: ',suburb,'\n'))
   temp_frame<-scrape_suburb(suburb,dwelling_type='All')
   big_domain_dataset%<>%bind_rows(temp_frame)
+  if(is.data.frame(temp_frame)){
+    write_csv(temp_frame,'./Outputs/rolling_domain_data.csv',append=T)
+  }
 }
 
-
-
+write.csv(big_domain_dataset,'./scraped_domain_nsw.csv')
