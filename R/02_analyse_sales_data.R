@@ -133,17 +133,8 @@ model_data<-cleaned_data%>%
          parking<=5,
          as.numeric(year)>=2020)
 
-#finally, arrange such that each LGA appears in each chunk otherwise we run into issues
-model_data%<>%
-  group_by(lga_name_2022) %>%
-  mutate(cycle = row_number()) %>%
-  ungroup() %>%
-  arrange(cycle, lga_name_2022) %>%
-  select(-cycle)
 #run model
-#need to use {biglm} because it gets big
-#rest_of_data<-model_data[100000:nrow(model_data),]
-hedonic_model<-biglm(model_data,
+hedonic_model<-lm(model_data,
                     formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
 
 #make predictions
