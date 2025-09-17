@@ -13,8 +13,7 @@ pacman::p_load(
   shiny,
   magrittr,
   systemfonts,
-  quantreg,
-  biglm
+  quantreg
 )
 
 #Basic Setup and Useful things
@@ -110,6 +109,8 @@ cleaned_data%<>%
          price=str_remove_all(price,","),
          price=as.numeric(price))
 
+#save clean data
+write_csv(cleaned_data,'./Outputs/cleaned_domain_data.csv')
 #analysis----
 #Get year-by-type stats by LGA
 lga_averages<-cleaned_data%>%
@@ -133,16 +134,48 @@ model_data<-cleaned_data%>%
          parking<=5,
          as.numeric(year)>=2020)
 
+
 #run model
-hedonic_model<-lm(model_data,
-                    formula=log(price)~lga_name_2022+beds+baths+parking+prop_type_clean+year+year*lga_name_2022)
+house_model<-rq(model_data,
+                    formula=log(price)~beds+baths+parking+property_type+year+lga_name_2022,
+                  tau=0.45)
 
-#make predictions
-exp(predict(hedonic_model,newdata = data.frame(lga_name_2022='Blacktown',
-                                           year="2024",
-                                           beds=3,
-                                           baths=2,
+townhouse_model<-lm(model_data,
+                    formula=log(price)~beds+baths+parking+property_type+year+lga_name_2022)
+
+  
+#Play around with predictions
+exp(predict(townhouse_model,newdata = data.frame(lga_name_2022='Woollahra',
+                                           year="2025",
+                                           beds=2,
+                                           baths=1,
                                            parking=1,
-                                           prop_type_clean='House')))
+                                           property_type='Apartment / Unit / Flat')))
 
-#predict price of a 3-bedroom, 2 bath townhouse in each LGA in 2024
+#predict price of a 3-bedroom, 1 bath, 2 parking house  in each LGA in 2024
+small_house_prices<-data.frame(lga_name_2022=unique(model_data$lga_name_2022))
+
+small_house_prices%<>%mutate(predicted_price=exp(predict(house_model,newdata=data.frame(
+  lga_name_2022=lga_name_2022,
+  year="2024",
+  beds=3,
+  baths=1,
+  parking=1,
+  property_type='House'
+))))
+
+
+#repeat for a 2.5 bedroom, 1 bath, 2 parking townhouse
+dual_occ_prices<-data.frame(lga_name_2022=unique(model_data$lga_name_2022))
+
+dual_occ_prices%<>%mutate(predicted_price=exp(predict(townhouse_model,newdata=data.frame(
+  lga_name_2022=lga_name_2022,
+  year="2024",
+  beds=2.5,
+  baths=1,
+  parking=1,
+  property_type='Semi-detached'
+))))
+#save outputs 
+write.csv(small_house_prices,'./Outputs/small_house_predictions.csv')
+write.csv(dual_occ_prices,'./Outputs/dual_occ_predictions.csv')
